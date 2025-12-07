@@ -30,10 +30,7 @@ if __name__ == "__main__":
     n_estimators = int(sys.argv[1]) if len(sys.argv) > 1 else 505
     max_depth = int(sys.argv[2]) if len(sys.argv) > 2 else 35
 
-    # BUANG MLFLOW_RUN_ID kalau ada, biar run baru bersih
-    os.environ.pop("MLFLOW_RUN_ID", None)
-
-    # PENTING: simpan objek run jadi variable
+    # mulai run MLflow
     with mlflow.start_run(run_name="rf-credit-score") as run:
         model = RandomForestClassifier(
             n_estimators=n_estimators,
@@ -43,19 +40,18 @@ if __name__ == "__main__":
 
         predicted_qualities = model.predict(X_test)
 
+        # SIMPAN MODEL SEBAGAI ARTIFACT "model"
         mlflow.sklearn.log_model(
             sk_model=model,
-            artifact_path="model",   # <-- path yang mau dipakai build-docker
+            artifact_path="model",   # <--- ini yang dipakai di build-docker
             input_example=input_example,
         )
 
         accuracy = model.score(X_test, y_test)
         mlflow.log_metric("accuracy", accuracy)
 
-        # TULIS run_id ke file agar bisa dipakai di CI/CD
+        # tulis run_id ke file, biar CI bisa baca
         run_id = run.info.run_id
         print(f"Training run id: {run_id}")
-
-        # file ini akan muncul di dalam folder MLproject/
-        with open("run_id.txt", "w") as f:
+        with open(os.path.join(os.path.dirname(__file__), "run_id.txt"), "w") as f:
             f.write(run_id)
