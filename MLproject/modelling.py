@@ -11,6 +11,9 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     np.random.seed(40)
 
+    # ⬇️ FIX PENTING: buang MLFLOW_RUN_ID dari environment
+    os.environ.pop("MLFLOW_RUN_ID", None)
+
     # Ambil path CSV dari argumen ke-3 atau default train_pca.csv di folder yang sama
     file_path = (
         sys.argv[3]
@@ -31,20 +34,23 @@ if __name__ == "__main__":
 
     # Hyperparameter dari argumen CLI
     n_estimators = int(sys.argv[1]) if len(sys.argv) > 1 else 505
-    max_depth = int(sys.argv[2]) if len(sys.argv) > 2 else 37
+    max_depth = int(sys.argv[2]) if len(sys.argv) > 2 else 35
 
-    # TANPA mlflow.start_run() di sini
-    model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth)
-    model.fit(X_train, y_train)
+    # ⬇️ Mulai run MLflow baru (sekarang aman)
+    with mlflow.start_run(run_name="rf-credit-score"):
+        model = RandomForestClassifier(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+        )
+        model.fit(X_train, y_train)
 
-    predicted_qualities = model.predict(X_test)
+        predicted_qualities = model.predict(X_test)
 
-    mlflow.sklearn.log_model(
-        sk_model=model,
-        artifact_path="model",
-        input_example=input_example,
-    )
+        mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path="model",   # warning boleh diabaikan buat sekarang
+            input_example=input_example,
+        )
 
-    # Log metrics
-    accuracy = model.score(X_test, y_test)
-    mlflow.log_metric("accuracy", accuracy)
+        accuracy = model.score(X_test, y_test)
+        mlflow.log_metric("accuracy", accuracy)
