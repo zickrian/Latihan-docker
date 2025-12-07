@@ -17,55 +17,70 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE
-      - uses: actions/checkout@v3
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      # Setup Python 3.12.7
+      # 2. Setup Python
       - name: Set up Python 3.12.7
         uses: actions/setup-python@v4
         with:
           python-version: "3.12.7"
-      
-      # Check Env Variables
+
+      # 3. Cek env (optional, cuma buat debug)
       - name: Check Env
         run: |
-          echo $CSV_URL
-      # Install mlflow
+          echo "CSV_URL = $CSV_URL"
+          echo "TARGET_VAR = $TARGET_VAR"
+
+      # 4. Install dependencies (mlflow + libs buat modelling.py)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install mlflow  
-          
-      # Run as a mlflow project
-      - name: Run mlflow project
+          pip install mlflow pandas scikit-learn numpy
+
+      # 5. Run MLflow project (pakai environment yang sama / local)
+      - name: Run MLflow project
         run: |
-          mlflow run MLproject --env-manager=local  
-      
-      # Get latest run_id
+          mlflow run MLproject --env-manager=local
+
+      # 6. Ambil RUN_ID terakhir dari MLflow (pakai MlflowClient, bukan ls)
       - name: Get latest MLflow run_id
         run: |
-          RUN_ID=$(ls -td mlruns/0/*/ | head -n 1 | cut -d'/' -f3)
+          RUN_ID=$(python - << 'PY'
+          import mlflow
+
+          client = mlflow.tracking.MlflowClient()
+          runs = client.search_runs(
+              experiment_ids=["0"],               # default experiment
+              max_results=1,
+              order_by=["attributes.start_time DESC"],
+          )
+          print(runs[0].info.run_id)
+          PY
+          )
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-          echo "Latest run_id: $RUN_ID"
-          
-      # Build Docker Model
+          echo "Latest MLflow run_id: $RUN_ID"
+
+      # 7. Build Docker image dari model MLflow
       - name: Build Docker Model
         run: |
-          mlflow models build-docker --model-uri "runs:/$RUN_ID/model" --name "cc" 
+          echo "Building Docker image from RUN_ID=$RUN_ID"
+          mlflow models build-docker --model-uri "runs:/$RUN_ID/model" --name "cc"
 
-      # Login to Docker Hub
+      # 8. Login ke Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      # Tag the Docker image
+      # 9. Tag image untuk Docker Hub
       - name: Tag Docker Image
         run: |
           docker tag cc ${{ secrets.DOCKER_HUB_USERNAME }}/cc:latest
 
-      # Push Docker image to Docker Hub
+      # 10. Push image ke Docker Hub
       - name: Push Docker Image
         run: |
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/cc:latest
