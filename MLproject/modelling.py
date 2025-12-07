@@ -49,7 +49,8 @@ if __name__ == "__main__":
     )
     model.fit(X_train, y_train)
 
-    predicted_qualities = model.predict(X_test)
+    # Note: predictions are not used, but keeping for potential future use
+    # predicted_qualities = model.predict(X_test)
 
     # SIMPAN MODEL SEBAGAI ARTIFACT "model"
     mlflow.sklearn.log_model(
@@ -73,7 +74,10 @@ if __name__ == "__main__":
             max_results=1,
             order_by=["attributes.start_time DESC"],
         )
-        run_id = runs[0].info.run_id if runs else "unknown"
+        if runs:
+            run_id = runs[0].info.run_id
+        else:
+            run_id = "unknown"
     
     print(f"Training run id: {run_id}")
     with open(os.path.join(os.path.dirname(__file__), "run_id.txt"), "w") as f:
