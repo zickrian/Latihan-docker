@@ -60,8 +60,9 @@ if __name__ == "__main__":
     
     # Create or use a run context for logging
     # When running under `mlflow run`, we use the existing run ID
-    # Otherwise, we create a new run
-    with mlflow.start_run(run_id=mlflow_run_id, run_name="rf-credit-score" if not mlflow_run_id else None) as run:
+    # Otherwise, we create a new run with a specific name
+    run_name = None if mlflow_run_id else "rf-credit-score"
+    with mlflow.start_run(run_id=mlflow_run_id, run_name=run_name) as run:
         mlflow.sklearn.log_model(
             sk_model=model,
             artifact_path="model",
