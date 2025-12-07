@@ -11,16 +11,24 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     np.random.seed(40)
     
-    # Fix tracking URI if running under mlflow run with relative path
+    # Debug: print environment and paths
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Script location: {os.path.abspath(__file__)}")
+    print(f"MLFLOW_RUN_ID: {os.environ.get('MLFLOW_RUN_ID', 'NOT SET')}")
+    print(f"MLFLOW_TRACKING_URI: {os.environ.get('MLFLOW_TRACKING_URI', 'NOT SET')}")
+    
+    # Get the parent directory (repository root)
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    # Always fix the tracking URI to use absolute paths
     tracking_uri = os.environ.get('MLFLOW_TRACKING_URI', '')
     if tracking_uri.startswith('sqlite:///') and not tracking_uri.startswith('sqlite:////'):
-        # It's a relative path, make it absolute from the project root
         db_path = tracking_uri.replace('sqlite:///', '')
         if not os.path.isabs(db_path):
-            # We're in MLproject directory, go up one level
-            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            # The database path is relative, make it absolute
             abs_db_path = os.path.join(parent_dir, db_path)
             new_tracking_uri = f'sqlite:///{abs_db_path}'
+            print(f"Changing tracking URI from {tracking_uri} to {new_tracking_uri}")
             mlflow.set_tracking_uri(new_tracking_uri)
 
     file_path = (
@@ -52,33 +60,25 @@ if __name__ == "__main__":
     # Note: predictions are not used, but keeping for potential future use
     # predicted_qualities = model.predict(X_test)
 
-    # SIMPAN MODEL SEBAGAI ARTIFACT "model"
-    mlflow.sklearn.log_model(
-        sk_model=model,
-        artifact_path="model",   # <--- ini yang dipakai di build-docker
-        input_example=input_example,
-    )
-
-    accuracy = model.score(X_test, y_test)
-    mlflow.log_metric("accuracy", accuracy)
-
-    # Get the current run ID (works both with mlflow run and standalone)
-    run = mlflow.active_run()
-    if run:
-        run_id = run.info.run_id
-    else:
-        # If no active run, get it from the tracking client
-        client = mlflow.tracking.MlflowClient()
-        runs = client.search_runs(
-            experiment_ids=["0"],
-            max_results=1,
-            order_by=["attributes.start_time DESC"],
-        )
-        if runs:
-            run_id = runs[0].info.run_id
-        else:
-            run_id = "unknown"
+    # Check if we're running under mlflow run (has MLFLOW_RUN_ID env var)
+    mlflow_run_id = os.environ.get('MLFLOW_RUN_ID')
     
+    # Create or use a run context for logging
+    with mlflow.start_run(run_id=mlflow_run_id, run_name="rf-credit-score" if not mlflow_run_id else None) as run:
+        if mlflow_run_id:
+            print(f"Running under mlflow run with ID: {mlflow_run_id}")
+        else:
+            print("Standalone execution, creating new run...")
+        
+        mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path="model",
+            input_example=input_example,
+        )
+        accuracy = model.score(X_test, y_test)
+        mlflow.log_metric("accuracy", accuracy)
+        run_id = run.info.run_id
+
     print(f"Training run id: {run_id}")
     with open(os.path.join(os.path.dirname(__file__), "run_id.txt"), "w") as f:
         f.write(run_id)
