@@ -11,24 +11,19 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     np.random.seed(40)
     
-    # Debug: print environment and paths
-    print(f"Current directory: {os.getcwd()}")
-    print(f"Script location: {os.path.abspath(__file__)}")
-    print(f"MLFLOW_RUN_ID: {os.environ.get('MLFLOW_RUN_ID', 'NOT SET')}")
-    print(f"MLFLOW_TRACKING_URI: {os.environ.get('MLFLOW_TRACKING_URI', 'NOT SET')}")
-    
     # Get the parent directory (repository root)
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     # Always fix the tracking URI to use absolute paths
+    # This ensures that when running under `mlflow run`, which changes to the MLproject directory,
+    # we still access the same database as the parent process
     tracking_uri = os.environ.get('MLFLOW_TRACKING_URI', '')
     if tracking_uri.startswith('sqlite:///') and not tracking_uri.startswith('sqlite:////'):
         db_path = tracking_uri.replace('sqlite:///', '')
         if not os.path.isabs(db_path):
-            # The database path is relative, make it absolute
+            # The database path is relative, make it absolute from the repository root
             abs_db_path = os.path.join(parent_dir, db_path)
             new_tracking_uri = f'sqlite:///{abs_db_path}'
-            print(f"Changing tracking URI from {tracking_uri} to {new_tracking_uri}")
             mlflow.set_tracking_uri(new_tracking_uri)
 
     file_path = (
@@ -64,12 +59,9 @@ if __name__ == "__main__":
     mlflow_run_id = os.environ.get('MLFLOW_RUN_ID')
     
     # Create or use a run context for logging
+    # When running under `mlflow run`, we use the existing run ID
+    # Otherwise, we create a new run
     with mlflow.start_run(run_id=mlflow_run_id, run_name="rf-credit-score" if not mlflow_run_id else None) as run:
-        if mlflow_run_id:
-            print(f"Running under mlflow run with ID: {mlflow_run_id}")
-        else:
-            print("Standalone execution, creating new run...")
-        
         mlflow.sklearn.log_model(
             sk_model=model,
             artifact_path="model",
