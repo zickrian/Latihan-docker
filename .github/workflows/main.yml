@@ -78,9 +78,11 @@ jobs:
       # 9. Tag image untuk Docker Hub
       - name: Tag Docker Image
         run: |
-          docker tag cc "${{ secrets.DOCKER_HUB_USERNAME }}/cc:latest"
+          USERNAME=$(echo "${{ secrets.DOCKER_HUB_USERNAME }}" | tr -d '\n\r ')
+          docker tag cc "${USERNAME}/cc:latest"
 
       # 10. Push image ke Docker Hub
       - name: Push Docker Image
         run: |
-          docker push "${{ secrets.DOCKER_HUB_USERNAME }}/cc:latest"
+          USERNAME=$(echo "${{ secrets.DOCKER_HUB_USERNAME }}" | tr -d '\n\r ')
+          docker push "${USERNAME}/cc:latest"
